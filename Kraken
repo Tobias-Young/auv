@@ -1,0 +1,137 @@
+% z=1:10:3000;
+% c=1500*[1+0.00737*(2*(z-1300)/1300-1+exp(-2*(z-1300)/1300))];
+%仰涛，2017/10/12
+%通过温度、盐度、深度数据换算得到声速剖面数据
+% fid=fopen('2901185_001','r');       %打开数据文件
+%    x()=fscanf(fid,'%g');                 %读取文件数据,得到的x数据为列向量
+data=1:1:3000;
+c(data)=1500*[1+0.00737*(2*(data-1300)/1300-1+exp(-2*(data-1300)/1300))];%c(i)是声速
+
+% cc(:,1)=c(:);%声速
+% cc(:,2)=data(:,2);%深度
+%axis([1480,1550,0,2100])
+%%
+%对声速数据进行插值，分N=200层，，每层深度1米。5:10:1995
+ x0=data(:);%深度
+y0=c(:);%声速
+x=5:10:2995;
+y=interp1(x0,y0,x,'spline');%三次样条插值,x,y为分100层后的声速剖面数据
+figure(1);
+plot(y0,x0,'k',y,x,'ro');%画声速剖面图
+set(gca,'YDir','reverse');
+title('声速剖面图');
+legend('插值前声速','插值后声速')
+xlabel('c（m/s）');ylabel('d(m)');
+%%
+%矩阵A的求取
+h=10;%分层水柱厚度
+w=15*2*pi;%声源频率
+for j=1:1:300
+    a(j)=-2+(h*w)^2/y(j)^2;
+end
+for k=1:1:300
+    A(k,k)=a(k);
+end
+for m=1:1:298
+    A(m,m+1)=1;
+    A(m+1,m)=1;
+end
+A(299,300)=1;
+A(300,299)=2;
+%%
+%求取A的特征向量V和特征值D
+[V,D]=eig(A);
+for n=1:1:300
+    k(n)=(D(n,n)/(h^2))^0.5;   %k(n)为km
+end
+%%
+% %解p,first simulation``
+% syms z;
+% syms r; %定义变量z，r,设源深1010米
+% pp=0;
+% z=61;
+% for ii=1:1:100
+%      pp=pp+(V(51,ii)*V(z,ii))*exp(i*k(ii)*r)/(k(ii)^0.5); %离散化的z，取10、30、50....1990一百个数
+% end
+% % pp=0;
+% % for iii=1:1:100
+% %     pp=pp+ppp(iii);
+% % end
+% p=(i/(1025*((8*pi*r)^0.5)))*(exp(-i*pi/4))*(pp);
+% %%
+% k0=w/c(51);
+% p0=exp(i*1*k0)/(4*pi*1);
+% TL_RD1210=-20*log10(abs(p/p0));
+% % r=0:1:100000;
+% % figure(2);
+% % plot(r,TL_RD1210)
+% r=1:1:5000;
+% zz=eval(TL_RD1210);
+% plot(r,zz);
+% title('传播损失图');
+% xlabel('横向距离/m');
+% ylabel('传播损失/db');
+%%
+%second simulation
+%解p,first simulation
+
+for z=1:1:300
+for r=1:1:5000
+pp=0;
+for ii=1:1:300
+     pp=pp+(V(300,ii)*V(z,ii))*exp(i*k(ii)*r)/(k(ii)^0.5); %声源深度V（？,ii）,D=?
+end
+p(r,z)=(i/(1025*((8*pi*r)^0.5)))*(exp(-i*pi/4))*(pp);
+k0=w/c(300);%c(D)
+p0=exp(i*1*k0)/(4*pi*1);
+TL_SD1010(r,z)=-20*log10(abs(p(r,z)/p0));
+end
+end
+z=1:1:300;
+zz=5+(z-1)*10;
+r=1:1:500;
+spl=20*log10(abs(p)/0.00002);
+
+save('kraken-1114','TL','p','z','zz','r','spl');
+
+figure(2);
+mesh(r,zz,(TL)');
+view(0,90);
+set(gca,'YDir','reverse');
+title('传播损失图');
+xlabel('r/m');
+ylabel('z/m');
+colorbar;
+%%
+%求某一接收深度处的传播损失
+% figure;
+% TLL=TL_SD1010(r,61);
+% plot(r,TLL);
+% title('传播损失图');
+% xlabel('r/m');
+% ylabel('z/m');
+%%
+%绘制声压图
+figure(3);
+mesh(r,zz,spl(r,z));
+view(0,90);
+set(gca,'YDir','reverse');
+title('声压图');
+xlabel('z/m');
+ylabel('r/m');
+colorbar;
+%绘制声压水平剖面图
+figure(4);
+plot(r,spl(r,300))
+xlabel('r/m');
+ylabel('声压/pa');
+title('声压水平剖面(z=2995m)');
+%绘制声压垂直剖面图
+figure(5);
+plot(zz,spl(1,z))
+xlabel('z/m');
+ylabel('声压/pa');
+title('声压垂直剖面(r=0m)');
+
+
+
